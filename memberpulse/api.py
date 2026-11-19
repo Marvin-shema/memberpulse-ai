@@ -12,11 +12,15 @@ from __future__ import annotations
 
 import hmac
 import os
+import time
 import uuid
+from collections import defaultdict, deque
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from .agent import MerchantAgent
@@ -28,8 +32,23 @@ from .retention import run_renewal_campaign
 app = FastAPI(title="MemberPulse AI", version="1.0.0",
               description="AI assistant, churn prediction and retention automation for membership businesses.")
 
+STATIC_DIR = Path(__file__).parent / "static"
+
 # In-memory conversation store. A production deployment would use Redis or the database.
 _conversations: dict[str, list[dict[str, Any]]] = {}
+
+# Simple per-IP rate limit for the chat endpoint, so a public demo can't run up an API bill.
+CHAT_LIMIT_PER_HOUR = int(os.getenv("CHAT_LIMIT_PER_HOUR", "20"))
+_chat_hits: dict[str, deque] = defaultdict(deque)
+
+
+def _rate_limit(ip: str) -> None:
+    now, hits = time.time(), _chat_hits[ip]
+    while hits and now - hits[0] > 3600:
+        hits.popleft()
+    if len(hits) >= CHAT_LIMIT_PER_HOUR:
+        raise HTTPException(429, "Chat limit reached for this hour. Please try again later.")
+    hits.append(now)
 
 
 @lru_cache
@@ -54,14 +73,24 @@ class CampaignRequest(BaseModel):
     use_llm: bool = True
 
 
+@app.get("/", include_in_schema=False)
+def dashboard() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
+
+
 @app.get("/health")
 def health() -> dict[str, Any]:
     a = get_app()
-    return {"status": "ok", "churn_model_auc": round(a.churn.auc or 0, 3)}
+    return {"status": "ok", "churn_model_auc": round(a.churn.auc or 0, 3),
+            "chat_enabled": bool(os.getenv("ANTHROPIC_API_KEY")),
+            "api_key_required": bool(os.getenv("MERCHANT_API_KEY"))}
 
 
 @app.post("/chat", dependencies=[Depends(require_key)])
-def chat(req: ChatRequest) -> dict[str, Any]:
+def chat(req: ChatRequest, request: Request) -> dict[str, Any]:
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        raise HTTPException(503, "The AI chat is turned off in this demo because no Anthropic API key is set.")
+    _rate_limit(request.client.host if request.client else "unknown")
     a = get_app()
     conv_id = req.conversation_id or str(uuid.uuid4())
     history = _conversations.get(conv_id, [])
@@ -79,6 +108,31 @@ def chat(req: ChatRequest) -> dict[str, Any]:
 @app.get("/summary", dependencies=[Depends(require_key)])
 def summary() -> dict[str, Any]:
     return get_app().toolbox.business_summary()
+
+
+@app.get("/revenue", dependencies=[Depends(require_key)])
+def revenue(months: int = 6) -> dict[str, Any]:
+    return get_app().toolbox.revenue_trend(months)
+
+
+@app.get("/renewals", dependencies=[Depends(require_key)])
+def renewals(days_ahead: int = 7, risk_level: str = "any") -> list[dict[str, Any]]:
+    return get_app().toolbox.upcoming_renewals(days_ahead, risk_level)
+
+
+@app.get("/corporate-accounts", dependencies=[Depends(require_key)])
+def corporate_accounts() -> list[dict[str, Any]]:
+    return get_app().toolbox.corporate_accounts()
+
+
+@app.post("/demo/reset", dependencies=[Depends(require_key)])
+def reset_demo() -> dict[str, Any]:
+    """Clear the approval queue and outbox so a fresh visitor sees a clean demo."""
+    a = get_app()
+    with a.store.connect() as con:
+        con.execute("DELETE FROM actions")
+        con.execute("DELETE FROM outbox")
+    return {"status": "reset"}
 
 
 @app.get("/members/at-risk", dependencies=[Depends(require_key)])

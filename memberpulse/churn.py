@@ -101,22 +101,27 @@ class ChurnModel:
         blob = joblib.load(path)
         return cls(blob["pipeline"], blob["auc"])
 
-    def _explain(self, row: pd.DataFrame) -> list[str]:
-        """Per-member contribution = coefficient x standardised value (works for a linear model)."""
+    def _explain_all(self, X: pd.DataFrame) -> list[list[str]]:
+        """Per-member contribution = coefficient x standardised value (exact for a linear model).
+
+        Computed for all rows at once, so scoring 500 members takes milliseconds.
+        """
         prep = self.pipeline.named_steps["prep"]
         clf = self.pipeline.named_steps["clf"]
-        z = prep.transform(row)
+        z = prep.transform(X)
         z = z.toarray() if hasattr(z, "toarray") else np.asarray(z)
-        contrib = z[0][: len(NUMERIC)] * clf.coef_[0][: len(NUMERIC)]
-        order = np.argsort(contrib)[::-1]
-        reasons = []
-        for idx in order:
-            if contrib[idx] <= 0.15 or NUMERIC[idx] == "age":
-                continue
-            reasons.append(REASON_TEXT[NUMERIC[idx]][0])
-            if len(reasons) == 3:
-                break
-        return reasons or ["no strong warning signs"]
+        contrib = z[:, : len(NUMERIC)] * clf.coef_[0][: len(NUMERIC)]
+        out = []
+        for row in contrib:
+            reasons = []
+            for idx in np.argsort(row)[::-1]:
+                if row[idx] <= 0.15 or NUMERIC[idx] == "age":
+                    continue
+                reasons.append(REASON_TEXT[NUMERIC[idx]][0])
+                if len(reasons) == 3:
+                    break
+            out.append(reasons or ["no strong warning signs"])
+        return out
 
     def score_all(self, store: Store, only_active: bool = True) -> list[ChurnScore]:
         if self.pipeline is None:
@@ -125,11 +130,11 @@ class ChurnModel:
         if not rows:
             return []
         df = self._frame(rows)
-        probs = self.pipeline.predict_proba(df[NUMERIC + CATEGORICAL])[:, 1]
-        out = []
-        for i, p in enumerate(probs):
-            out.append(ChurnScore(df.iloc[i]["id"], float(p), risk_level(float(p)),
-                                  self._explain(df.iloc[[i]][NUMERIC + CATEGORICAL])))
+        X = df[NUMERIC + CATEGORICAL]
+        probs = self.pipeline.predict_proba(X)[:, 1]
+        reasons = self._explain_all(X)
+        out = [ChurnScore(df.iloc[i]["id"], float(p), risk_level(float(p)), reasons[i])
+               for i, p in enumerate(probs)]
         return sorted(out, key=lambda s: s.probability, reverse=True)
 
     def score_member(self, store: Store, member_id: str) -> ChurnScore | None:

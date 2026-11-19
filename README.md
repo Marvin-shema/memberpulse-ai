@@ -10,6 +10,8 @@ scikit-learn, FastAPI, SQLite and Docker. All data is synthetic.
 
 [![CI](https://github.com/Marvin-shema/memberpulse-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Marvin-shema/memberpulse-ai/actions/workflows/ci.yml)
 
+![MemberPulse dashboard](docs/desktop.png)
+
 ---
 
 ## What it does
@@ -22,6 +24,7 @@ scikit-learn, FastAPI, SQLite and Docker. All data is synthetic.
 | **Renewal & retention workflow** | Finds upcoming renewals, ranks them by churn risk, picks an offer from an auditable policy (reminder, 10–15% discount, or plan change), and has Claude write a personal message as **validated structured output**. Drafts are queued for approval, nothing is sent automatically. |
 | **Corporate memberships** | Lists employer accounts and seat usage; bulk-adds employees with seat-limit checks (approval required). |
 | **Business analytics** | MRR, churn rate, members per plan, revenue at risk, monthly collected vs failed payments. |
+| **Merchant dashboard** | A web page with the key numbers, revenue chart, members at risk (with reasons and plan tips), the approval queue and a chat box for the assistant. Works on phones and in dark mode. |
 | **REST API** | FastAPI endpoints a dashboard or backend can call, with API-key auth and an approve / reject queue. |
 
 ## Architecture
@@ -62,6 +65,8 @@ These are the parts I'd want in production, and they're tested:
   `/actions/{id}/approve`; an action can't be executed twice.
 * **Least privilege for the model.** The model only gets the tools listed, each with a strict schema, so
   arguments always match. There is no free-form SQL tool.
+* **Safe public demo.** Without an API key the chat switches off and everything else still works;
+  with a key, chat is rate-limited per visitor (`CHAT_LIMIT_PER_HOUR`, default 20) to cap spend.
 * **Customer data protection.** Emails and phone numbers are masked before anything is sent to the model.
   Secrets come from environment variables; the API can require an `X-API-Key` (compared in constant time).
 * **Graceful failure.** Tool errors go back to Claude as `is_error` results so it can correct itself;
@@ -71,7 +76,7 @@ These are the parts I'd want in production, and they're tested:
   `medium` for chat and `low` for message writing; the renewal campaign is a fixed workflow (one small LLM
   call per member) rather than an open-ended agent. Every run reports tokens and estimated cost.
 * **Observability.** Each tool call is recorded with input, permission level, outcome and latency.
-* **Tests.** 34 pytest tests cover data, model quality, recommendations, tools, approval flow, the agent
+* **Tests.** 39 pytest tests cover data, model quality, recommendations, tools, approval flow, the agent
   loop (with a scripted fake client) and the API. One test sends a real SDK request through a mocked HTTP
   layer to confirm the request shape. Tests need no API key and run in CI on every push.
 
@@ -116,12 +121,15 @@ Things to ask the assistant:
 ### REST API
 
 ```bash
-python -m memberpulse serve       # http://127.0.0.1:8000/docs
+python -m memberpulse serve       # dashboard at http://127.0.0.1:8000, API docs at /docs
 ```
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/health` | Status and model AUC |
+| GET | `/` | Merchant dashboard (web page) |
+| GET | `/health` | Status, model AUC, whether chat is on |
+| GET | `/revenue` · `/renewals` · `/corporate-accounts` | Dashboard data |
+| POST | `/demo/reset` | Clear the approval queue |
 | POST | `/chat` | `{"message": "...", "conversation_id": null}` → answer, tool calls, pending actions, usage |
 | GET | `/summary` | Business snapshot |
 | GET | `/members/at-risk?limit=20&risk_level=high` | Ranked churn risk with reasons |
@@ -136,6 +144,17 @@ python -m memberpulse serve       # http://127.0.0.1:8000/docs
 docker build -t memberpulse-ai .
 docker run -p 8000:8000 -e ANTHROPIC_API_KEY=sk-ant-... -e MERCHANT_API_KEY=change-me memberpulse-ai
 ```
+
+### Deploy online (free, on Render)
+
+The repo includes a `render.yaml`, so Render can build and host it from GitHub:
+
+1. Sign in at [render.com](https://render.com) with your GitHub account.
+2. Click **New → Blueprint**, pick this repository, and click **Apply**.
+3. Optional: add `ANTHROPIC_API_KEY` in the service's **Environment** tab to turn on the chat.
+
+Render gives you a public URL like `https://memberpulse-ai.onrender.com`. Free services sleep when
+unused, so the first visit after a while takes about a minute to wake up.
 
 ## Design choices
 

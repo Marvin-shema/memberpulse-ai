@@ -70,3 +70,35 @@ def test_api_campaign_approve_flow(client, store):
 
 def test_api_recommendation_404(client):
     assert client.get("/members/NOPE/recommendation").status_code == 404
+
+
+def test_dashboard_page_is_served(client):
+    r = client.get("/")
+    assert r.status_code == 200 and "MemberPulse AI" in r.text
+
+
+def test_dashboard_data_endpoints(client):
+    assert len(client.get("/revenue?months=6").json()["months"]) == 6
+    assert isinstance(client.get("/renewals?days_ahead=7").json(), list)
+    assert client.get("/corporate-accounts").json()[0]["seats_available"] >= 0
+
+
+def test_chat_is_disabled_without_api_key(client, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert client.get("/health").json()["chat_enabled"] is False
+    assert client.post("/chat", json={"message": "hi"}).status_code == 503
+
+
+def test_chat_rate_limit(client, monkeypatch):
+    monkeypatch.setattr(api, "CHAT_LIMIT_PER_HOUR", 2)
+    api._chat_hits.clear()
+    api._rate_limit("1.2.3.4"); api._rate_limit("1.2.3.4")
+    with pytest.raises(api.HTTPException):
+        api._rate_limit("1.2.3.4")
+
+
+def test_demo_reset_clears_queue(client):
+    client.post("/campaigns/renewals", json={"days_ahead": 7, "limit": 2, "use_llm": False})
+    assert client.get("/actions").json()
+    client.post("/demo/reset")
+    assert client.get("/actions").json() == []

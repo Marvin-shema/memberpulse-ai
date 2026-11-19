@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MemberPulse AI</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230f766e'/><path d='M5 17h6l3-7 4 13 3-6h6' stroke='white' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<style>
+  :root {
+    --bg: #f5f7f6; --panel: #ffffff; --ink: #14201d; --muted: #5d6b67; --line: #e2e8e5;
+    --brand: #0f766e; --brand-soft: #e3f2ef; --high: #b42318; --high-soft: #fde8e6;
+    --med: #b54708; --med-soft: #fef0e1; --low: #067647; --low-soft: #e5f5ec;
+    --shadow: 0 1px 2px rgba(16, 24, 22, .06), 0 1px 1px rgba(16, 24, 22, .04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1412; --panel: #151f1c; --ink: #e7eeeb; --muted: #94a3a0; --line: #26332f;
+      --brand: #2dd4bf; --brand-soft: #123631; --high: #f97066; --high-soft: #3b1714;
+      --med: #fdb022; --med-soft: #3a2a0c; --low: #47cd89; --low-soft: #0f2e1f; --shadow: none;
+    }
+    button.primary, .me { color: #04201c !important; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { background: var(--panel); border-bottom: 1px solid var(--line); }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 16px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0; flex-wrap: wrap; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+  .logo small { font-weight: 400; color: var(--muted); font-size: 13px; }
+  .pill { font-size: 12px; padding: 3px 10px; border-radius: 99px; background: var(--brand-soft); color: var(--brand); white-space: nowrap; }
+  main.wrap { padding-top: 20px; padding-bottom: 48px; }
+  .grid { display: grid; gap: 16px; }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+  .two { grid-template-columns: 1.4fr 1fr; }
+  @media (max-width: 900px) { .two { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); min-width: 0; }
+  .card h2 { font-size: 15px; margin: 0 0 4px; }
+  .card p.sub { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  .kpi .label { color: var(--muted); font-size: 13px; }
+  .kpi .value { font-size: 26px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .kpi .hint { font-size: 12px; color: var(--muted); }
+  .section { margin-top: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  td { padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  .scroll { overflow-x: auto; }
+  .badge { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; font-weight: 600; }
+  .high { background: var(--high-soft); color: var(--high); }
+  .medium { background: var(--med-soft); color: var(--med); }
+  .low { background: var(--low-soft); color: var(--low); }
+  .reasons { color: var(--muted); font-size: 13px; }
+  button { font: inherit; font-size: 13px; border-radius: 8px; padding: 6px 12px; cursor: pointer;
+           border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  button:hover { border-color: var(--brand); }
+  button.primary { background: var(--brand); color: #fff; border-color: var(--brand); }
+  button.primary:hover { filter: brightness(1.08); }
+  button.danger { color: var(--high); }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .chart { width: 100%; height: 300px; }
+  .chart text { fill: var(--muted); font-size: 11px; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .action { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .action .msg { background: var(--bg); border-radius: 8px; padding: 8px 10px; margin: 8px 0; font-size: 14px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  @media (max-width: 600px) { .reasons-col { display: none; } }
+  .empty { color: var(--muted); font-size: 14px; padding: 14px 0; text-align: center; }
+  .chat-log { height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 4px 2px 10px; }
+  .bubble { padding: 9px 12px; border-radius: 12px; max-width: 88%; white-space: pre-wrap; font-size: 14px; }
+  .me { align-self: flex-end; background: var(--brand); color: #fff; border-bottom-right-radius: 4px; }
+  .bot { align-self: flex-start; background: var(--bg); border-bottom-left-radius: 4px; }
+  .tools { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .chat-form { display: flex; gap: 8px; }
+  .chat-form input { flex: 1; min-width: 0; font: inherit; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  .suggest { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; }
+  .suggest button { font-size: 12px; padding: 4px 10px; border-radius: 99px; }
+  .rec { margin-top: 6px; font-size: 13px; background: var(--brand-soft); border-radius: 8px; padding: 8px 10px; }
+  .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+           padding: 10px 16px; border-radius: 10px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 32px); }
+  .toast.show { opacity: 1; }
+  .keybar { display: none; gap: 8px; align-items: center; margin-top: 12px; }
+  .keybar input { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+  footer { color: var(--muted); font-size: 13px; text-align: center; padding: 24px 0; }
+  footer a { color: var(--brand); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap top">
+    <div class="logo">
+      <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#0f766e"/><path d="M5 17h6l3-7 4 13 3-6h6" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div>MemberPulse AI<br><small>Lion Peak Fitness · demo merchant</small></div>
+    </div>
+    <div class="row">
+      <span class="pill" id="modelPill">Churn model</span>
+      <button id="resetBtn" title="Clear the approval queue">Reset demo</button>
+      <a href="/docs"><button>API docs</button></a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="keybar" id="keybar">
+    <span class="muted">This server needs an access key:</span>
+    <input id="keyInput" type="password" placeholder="X-API-Key">
+    <button class="primary" id="keySave">Save</button>
+  </div>
+
+  <div class="grid kpis" id="kpis"></div>
+
+  <div class="grid two section">
+    <div class="card">
+      <h2>Revenue, last 6 months</h2>
+      <p class="sub">Successful payments vs. declined payments each month</p>
+      <svg class="chart" id="chart" viewBox="0 0 600 300" preserveAspectRatio="none" role="img" aria-label="Revenue chart"></svg>
+      <div class="legend"><span><i style="background:var(--brand)"></i>Collected</span><span><i style="background:var(--high)"></i>Failed</span></div>
+    </div>
+    <div class="card">
+      <h2>Ask the assistant</h2>
+      <p class="sub" id="chatSub">Claude answers using live business data and asks before it changes anything.</p>
+      <div class="suggest" id="suggest"></div>
+      <div class="chat-log" id="chatLog"></div>
+      <form class="chat-form" id="chatForm">
+        <input id="chatInput" placeholder="e.g. Who should I call this week?" autocomplete="off" maxlength="1000">
+        <button class="primary" id="chatSend">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="grid two section">
+    <div class="card">
+      <h2>Members likely to cancel</h2>
+      <p class="sub">Ranked by the machine-learning churn model, with the reasons behind each score</p>
+      <div class="scroll"><table id="riskTable"></table></div>
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div><h2>Waiting for your approval</h2><p class="sub">Nothing is sent to a member until you approve it</p></div>
+        <button class="primary" id="campaignBtn">Draft renewal campaign</button>
+      </div>
+      <div id="actions"></div>
+    </div>
+  </div>
+
+  <div class="card section">
+    <h2>Corporate accounts</h2>
+    <p class="sub">Employee benefit memberships and seat usage</p>
+    <div class="scroll"><table id="corpTable"></table></div>
+  </div>
+</main>
+
+<footer>
+  All data is synthetic. Built with Python, Claude (tool use + structured outputs), scikit-learn and FastAPI ·
+  <a href="https://github.com/Marvin-shema/memberpulse-ai">Source on GitHub</a>
+</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const money = (n) => "$" + Math.round(n).toLocaleString();
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let apiKey = "";
+try { apiKey = localStorage.getItem("mp_key") || ""; } catch (e) {}
+let conversationId = null;
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 3200);
+}
+
+async function api(path, opts = {}) {
+  const headers = {"Content-Type": "application/json"};
+  if (apiKey) headers["X-API-Key"] = apiKey;
+  const res = await fetch(path, {...opts, headers});
+  if (res.status === 401) { $("keybar").style.display = "flex"; throw new Error("Access key needed"); }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.detail || `Request failed (${res.status})`);
+  return body;
+}
+
+async function loadSummary() {
+  const s = await api("/summary");
+  const tiles = [
+    ["Active members", s.active_members.toLocaleString(), `as of ${s.as_of}`],
+    ["Monthly recurring revenue", money(s.monthly_recurring_revenue), "after corporate discounts"],
+    ["Churn, last 90 days", (s.churn_rate_90_days * 100).toFixed(1) + "%", `${s.cancellations_last_90_days} cancellations`],
+    ["High-risk members", s.high_churn_risk_members, "predicted by the model"],
+    ["Revenue at risk", money(s.revenue_at_risk_monthly), "per month, high-risk members"],
+  ];
+  $("kpis").innerHTML = tiles.map(([l, v, h]) =>
+    `<div class="card kpi"><div class="label">${l}</div><div class="value">${v}</div><div class="hint">${h}</div></div>`).join("");
+}
+
+async function loadRevenue() {
+  const {months} = await api("/revenue?months=6");
+  const W = 600, H = 300, pad = 22, max = Math.max(...months.map(m => m.collected + m.failed)) * 1.1;
+  const bw = (W - pad) / months.length;
+  let svg = "";
+  months.forEach((m, i) => {
+    const x = pad / 2 + i * bw + bw * 0.2, w = bw * 0.6;
+    const hc = (m.collected / max) * (H - pad - 14), hf = (m.failed / max) * (H - pad - 14);
+    const yc = H - pad - hc, yf = yc - hf;
+    svg += `<rect x="${x}" y="${yc}" width="${w}" height="${hc}" rx="3" fill="var(--brand)"><title>${m.month}: ${money(m.collected)} collected</title></rect>`;
+    svg += `<rect x="${x}" y="${yf}" width="${w}" height="${Math.max(hf, 1)}" rx="2" fill="var(--high)"><title>${m.month}: ${money(m.failed)} failed</title></rect>`;
+    svg += `<text x="${x + w / 2}" y="${yf - 4}" text-anchor="middle">${(m.collected / 1000).toFixed(1)}k</text>`;
+    svg += `<text x="${x + w / 2}" y="${H - 6}" text-anchor="middle">${m.month}</text>`;
+  });
+  $("chart").innerHTML = svg;
+}
+
+async function loadRisk() {
+  const rows = await api("/members/at-risk?limit=8&risk_level=any");
+  $("riskTable").innerHTML = `<tr><th>Member</th><th>Risk</th><th class="reasons-col">Why</th><th></th></tr>` + rows.map(r => `
+    <tr>
+      <td><b>${esc(r.name)}</b><div class="muted">${r.member_id} · ${esc(r.plan_id)} · renews ${r.renewal_date}</div><div id="rec-${r.member_id}"></div></td>
+      <td><span class="badge ${r.risk_level}">${Math.round(r.churn_probability * 100)}%</span></td>
+      <td class="reasons reasons-col">${r.top_reasons.map(esc).join("; ")}</td>
+      <td><button data-rec="${r.member_id}">Plan tip</button></td>
+    </tr>`).join("");
+}
+
+async function showRec(id) {
+  try {
+    const r = await api(`/members/${id}/recommendation`);
+    const verb = {keep: "Keep on", upgrade: "Upgrade to", downgrade: "Downgrade to"}[r.action];
+    const change = r.price_change_monthly ? ` (${r.price_change_monthly > 0 ? "+" : ""}${money(r.price_change_monthly)}/mo)` : "";
+    $("rec-" + id).innerHTML = `<div class="rec"><b>${verb} ${esc(r.suggested_plan)}</b>${change}. ${esc(r.reason)}</div>`;
+  } catch (e) { toast(e.message); }
+}
+
+async function loadActions() {
+  const rows = await api("/actions?status=pending");
+  if (!rows.length) {
+    $("actions").innerHTML = `<div class="empty">No actions waiting. Click "Draft renewal campaign" or ask the assistant to contact a member.</div>`;
+    return;
+  }
+  const label = {offer_discount: "Retention discount", send_renewal_reminder: "Renewal reminder",
+                 change_member_plan: "Plan change", add_corporate_members: "Add corporate employees"};
+  $("actions").innerHTML = rows.slice(0, 8).map(a => {
+    const p = a.payload;
+    const detail = p.percent ? `${p.percent}% off for ${p.months} month(s)` : (p.channel ? `via ${p.channel}` : (p.new_plan_id ? `to ${p.new_plan_id}` : ""));
+    return `<div class="action">
+      <div class="row" style="justify-content:space-between"><b>${label[a.tool] || a.tool}</b><span class="muted">#${a.id} · ${esc(p.member_id || p.account_id)} · ${esc(detail)}</span></div>
+      ${p.message ? `<div class="msg">${esc(p.message)}</div>` : ""}
+      <div class="row"><button class="primary" data-approve="${a.id}">Approve &amp; send</button><button class="danger" data-reject="${a.id}">Reject</button></div>
+    </div>`;
+  }).join("") + (rows.length > 8 ? `<div class="muted">+ ${rows.length - 8} more</div>` : "");
+}
+
+async function loadCorp() {
+  const rows = await api("/corporate-accounts");
+  $("corpTable").innerHTML = `<tr><th>Company</th><th>Plan</th><th>Discount</th><th>Seats used</th><th>Available</th></tr>` +
+    rows.map(r => `<tr><td><b>${esc(r.company)}</b></td><td>${esc(r.plan_name)}</td><td>${r.discount_percent}%</td>
+      <td>${r.seats_used} / ${r.seats_purchased}</td><td>${r.seats_available}</td></tr>`).join("");
+}
+
+async function decide(id, verb) {
+  try {
+    await api(`/actions/${id}/${verb}`, {method: "POST"});
+    toast(verb === "approve" ? "Approved. Message sent to the (simulated) outbox." : "Rejected.");
+    loadActions();
+  } catch (e) { toast(e.message); }
+}
+
+function addBubble(text, who, extra = "") {
+  const b = document.createElement("div");
+  b.className = "bubble " + who;
+  b.innerHTML = esc(text) + extra;
+  $("chatLog").appendChild(b);
+  $("chatLog").scrollTop = $("chatLog").scrollHeight;
+  return b;
+}
+
+async function sendChat(text) {
+  if (!text.trim()) return;
+  addBubble(text, "me");
+  $("chatInput").value = "";
+  $("chatSend").disabled = true;
+  const thinking = addBubble("Looking at your data…", "bot");
+  try {
+    const r = await api("/chat", {method: "POST", body: JSON.stringify({message: text, conversation_id: conversationId})});
+    conversationId = r.conversation_id;
+    thinking.remove();
+    const tools = r.tool_calls.length
+      ? `<div class="tools">Used: ${r.tool_calls.map(t => esc(t.name)).join(", ")} · ${r.usage.input_tokens + r.usage.output_tokens} tokens · ~$${r.usage.estimated_cost_usd}</div>` : "";
+    addBubble(r.answer, "bot", tools);
+    if (r.pending_action_ids.length) { toast("New action waiting for your approval"); loadActions(); }
+  } catch (e) {
+    thinking.remove();
+    addBubble(e.message, "bot");
+  } finally { $("chatSend").disabled = false; }
+}
+
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.dataset.rec) showRec(t.dataset.rec);
+  if (t.dataset.approve) decide(t.dataset.approve, "approve");
+  if (t.dataset.reject) decide(t.dataset.reject, "reject");
+  if (t.dataset.q) sendChat(t.dataset.q);
+});
+
+$("chatForm").addEventListener("submit", (e) => { e.preventDefault(); sendChat($("chatInput").value); });
+
+$("campaignBtn").addEventListener("click", async () => {
+  $("campaignBtn").disabled = true;
+  try {
+    const r = await api("/campaigns/renewals", {method: "POST", body: JSON.stringify({days_ahead: 7, limit: 5, use_llm: true})});
+    toast(`${r.drafts_queued} personalised drafts created for ${r.renewals_found} upcoming renewals`);
+    loadActions();
+  } catch (e) { toast(e.message); } finally { $("campaignBtn").disabled = false; }
+});
+
+$("resetBtn").addEventListener("click", async () => {
+  try { await api("/demo/reset", {method: "POST"}); toast("Demo reset"); loadActions(); } catch (e) { toast(e.message); }
+});
+
+$("keySave").addEventListener("click", () => {
+  apiKey = $("keyInput").value.trim();
+  try { localStorage.setItem("mp_key", apiKey); } catch (e) {}
+  $("keybar").style.display = "none";
+  loadAll();
+});
+
+const SUGGESTIONS = ["How is the business doing?", "Who should I contact before renewals this week?",
+                     "Should M0069 change plans?", "How many seats does Umoja Bank have left?"];
+$("suggest").innerHTML = SUGGESTIONS.map(q => `<button data-q="${esc(q)}">${esc(q)}</button>`).join("");
+
+async function loadAll() {
+  try {
+    const h = await api("/health");
+    $("modelPill").textContent = `Churn model AUC ${h.churn_model_auc}`;
+    if (!h.chat_enabled) {
+      $("chatSub").textContent = "The AI chat is switched off on this demo server (no API key). Everything else on the page is live.";
+      $("chatInput").disabled = true; $("chatSend").disabled = true;
+      $("suggest").style.display = "none";
+      addBubble("Hi! I'm the MemberPulse assistant. Chat is turned off on this public demo, but you can run it yourself with an Anthropic API key. See the README on GitHub.", "bot");
+    } else {
+      addBubble("Hi! Ask me anything about your members, revenue or renewals.", "bot");
+    }
+    await Promise.all([loadSummary(), loadRevenue(), loadRisk(), loadActions(), loadCorp()]);
+  } catch (e) { toast(e.message); }
+}
+loadAll();
+</script>
+</body>
+</html>

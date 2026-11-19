@@ -1,0 +1,12 @@
+# One-click deploy on Render (https://render.com). Free plan; the demo data is built into the image.
+services:
+  - type: web
+    name: memberpulse-ai
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: ANTHROPIC_API_KEY      # optional: leave empty to run the dashboard with chat turned off
+        sync: false
+      - key: CHAT_LIMIT_PER_HOUR
+        value: "20"
