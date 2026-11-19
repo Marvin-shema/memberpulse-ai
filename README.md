@@ -10,6 +10,8 @@ scikit-learn, FastAPI, SQLite and Docker. All data is synthetic.
 
 [![CI](https://github.com/Marvin-shema/memberpulse-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/Marvin-shema/memberpulse-ai/actions/workflows/ci.yml)
 
+**Live demo: https://memberpulse-ai.onrender.com** (free hosting, so the first visit may take up to a minute to wake up)
+
 ![MemberPulse dashboard](docs/desktop.png)
 
 ---
